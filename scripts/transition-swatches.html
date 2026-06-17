@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<style>
+  @import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css');
+  * { margin: 0; box-sizing: border-box; }
+  body {
+    background: #fdfbf7;
+    background-image: radial-gradient(#e5e0d8 1px, transparent 1px);
+    background-size: 24px 24px;
+    font-family: 'LXGW WenKai', cursive;
+    color: #2d2d2d;
+    padding: 40px;
+  }
+  h1 { font-size: 28px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; }
+  .card {
+    border: 2px solid #2d2d2d;
+    border-radius: 30px 5px 25px 5px / 5px 25px 5px 30px;
+    box-shadow: 4px 4px 0 0 #2d2d2d;
+    overflow: hidden;
+    background: #fff;
+  }
+  .swatch { height: 150px; }
+  .label { padding: 12px 16px; font-size: 18px; }
+  .hex { font-size: 13px; color: rgba(45,45,45,.55); }
+  /* 135deg 对角，模拟曲面转场的渐变方向 */
+  .a { background: linear-gradient(135deg, #fdfbf7 15%, #ff4d4d 85%); }
+  .b { background: linear-gradient(135deg, #fff9c4 15%, #ff4d4d 85%); }
+  .c { background: linear-gradient(135deg, #fdfbf7 15%, #2d5da1 85%); }
+  .d { background: linear-gradient(135deg, #fff9c4 15%, #2d5da1 85%); }
+  .e { background: linear-gradient(135deg, #ff4d4d 15%, #2d2d2d 85%); }
+  .f { background: #fff9c4; }
+</style>
+</head>
+<body>
+  <h1>页面转场配色候选（曲面波浪渐变方向）</h1>
+  <div class="grid">
+    <div class="card"><div class="swatch a"></div><div class="label">A · 当前：米纸白 → 红 <span class="hex">#fdfbf7 → #ff4d4d</span></div></div>
+    <div class="card"><div class="swatch b"></div><div class="label">B · 便利贴黄 → 红（推荐）<span class="hex">#fff9c4 → #ff4d4d</span></div></div>
+    <div class="card"><div class="swatch c"></div><div class="label">C · 米纸白 → 蓝 <span class="hex">#fdfbf7 → #2d5da1</span></div></div>
+    <div class="card"><div class="swatch d"></div><div class="label">D · 便利贴黄 → 蓝 <span class="hex">#fff9c4 → #2d5da1</span></div></div>
+    <div class="card"><div class="swatch e"></div><div class="label">E · 红 → 铅笔黑 <span class="hex">#ff4d4d → #2d2d2d</span></div></div>
+    <div class="card"><div class="swatch f"></div><div class="label">F · 纯便利贴黄 <span class="hex">#fff9c4</span></div></div>
+  </div>
+</body>
+</html>

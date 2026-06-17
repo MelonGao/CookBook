@@ -1,0 +1,41 @@
+{
+  "name": "cookbook-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "寻味 —— 让做菜变成独具匠心的事",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/kalam": "^5.2.8",
+    "@fontsource/patrick-hand": "^5.2.8",
+    "@supabase/supabase-js": "^2.106.1",
+    "@uiw/react-md-editor": "^4.0.5",
+    "gsap": "^3.13.0",
+    "html2canvas": "^1.4.1",
+    "lucide-react": "^0.460.0",
+    "lxgw-wenkai-webfont": "^1.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.28.0",
+    "remark-gfm": "^4.0.0",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "puppeteer": "^24.43.1",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

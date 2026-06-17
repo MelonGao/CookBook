@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+dist.zip
+*.local
+.DS_Store
+npm-debug.log*
+
+# Claude Code 本地配置
+.claude/
+
+# 临时冒烟测试脚本
+smoke.mjs

@@ -1,0 +1,25 @@
+# SPA 路由回退 + 静态资源缓存（适用于 Apache，彩虹云主机/大多数虚拟主机均支持）
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 已存在的真实文件 / 目录，直接返回（JS、CSS、图片、favicon 等）
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 其余所有路径（/login、/recipes/xxx、/auth/callback 等）一律回退到 index.html
+  # 交给前端 React Router 处理，避免刷新/直达时 404
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# 带哈希的静态资源可长期缓存；index.html 不缓存，保证每次发布能拿到最新版
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?|svg|png|jpe?g|gif|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "index\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

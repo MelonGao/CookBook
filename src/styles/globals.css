@@ -1,0 +1,155 @@
+/* 全局样式：Tailwind 基础层 + 手绘草稿本基调（见 DESIGN_SYSTEM.md）
+   字体已在 main.tsx 通过 npm 自托管引入，这里不再外链。 */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  /* 米纸白 + 点状纸张纹理（DESIGN_SYSTEM §2.6） */
+  body {
+    @apply bg-paper text-pencil font-hand antialiased;
+    background-image: radial-gradient(#e5e0d8 1px, transparent 1px);
+    background-size: 24px 24px;
+    line-height: 1.7;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-title;
+  }
+
+  ::selection {
+    background: rgba(255, 77, 77, 0.22);
+  }
+}
+
+@layer components {
+  /* 通用表单输入：完整边框框 + wobbly + 蓝圆珠笔 focus（DESIGN_SYSTEM §3.3） */
+  .input {
+    @apply w-full rounded-wobbly-sm border-2 border-pencil bg-white px-4 py-2.5 text-pencil font-hand;
+    @apply focus:border-ballpoint focus:outline-none focus:ring-2 focus:ring-ballpoint/20;
+  }
+  .input::placeholder {
+    @apply text-pencil/40;
+  }
+
+  /* 菜谱正文 Markdown 渲染的草稿本排版（DESIGN_SYSTEM §3.6） */
+  .prose-cookbook {
+    @apply text-pencil font-hand;
+    line-height: 1.8;
+  }
+  .prose-cookbook h1,
+  .prose-cookbook h2,
+  .prose-cookbook h3 {
+    @apply font-title text-pencil mt-7 mb-3;
+  }
+  .prose-cookbook h1 {
+    @apply text-h2 md:text-h1;
+    /* 手绘波浪下划线 */
+    border-bottom: 3px solid #ff4d4d;
+    border-radius: 0 0 12px 3px / 0 0 8px 3px;
+    padding-bottom: 6px;
+    display: inline-block;
+  }
+  .prose-cookbook h2 {
+    @apply text-h3 md:text-h2;
+  }
+  .prose-cookbook h3 {
+    @apply text-xl;
+  }
+  .prose-cookbook p {
+    @apply my-3 text-body;
+  }
+  /* 自定义 bullet：食材 ◯、步骤 ▢（DESIGN_SYSTEM §3.6） */
+  .prose-cookbook ul {
+    @apply my-3 list-none pl-1;
+  }
+  .prose-cookbook ul > li {
+    @apply relative my-1.5 pl-7;
+  }
+  .prose-cookbook ul > li::before {
+    content: '◯';
+    @apply absolute left-0 text-accent;
+    font-size: 0.9em;
+  }
+  .prose-cookbook ol {
+    @apply my-3 list-none pl-1;
+    counter-reset: step;
+  }
+  .prose-cookbook ol > li {
+    @apply relative my-1.5 pl-8;
+    counter-increment: step;
+  }
+  .prose-cookbook ol > li::before {
+    content: '▢ ' counter(step);
+    @apply absolute left-0 font-title text-ballpoint;
+    font-size: 0.85em;
+  }
+  .prose-cookbook a {
+    @apply text-ballpoint underline decoration-2 underline-offset-2 hover:text-accent;
+  }
+  .prose-cookbook blockquote {
+    @apply my-4 border-l-[3px] border-dashed border-accent pl-4 text-pencil/70 italic;
+  }
+  .prose-cookbook code {
+    @apply rounded-wobbly-sm border-2 border-dashed border-pencil bg-muted px-1.5 py-0.5 text-sm;
+  }
+  .prose-cookbook pre {
+    @apply my-4 rounded-wobbly-sm border-2 border-dashed border-pencil bg-muted p-4 overflow-x-auto;
+  }
+  .prose-cookbook pre code {
+    @apply border-0 bg-transparent p-0;
+  }
+  .prose-cookbook table {
+    @apply my-4 w-full border-collapse text-sm;
+  }
+  .prose-cookbook th,
+  .prose-cookbook td {
+    @apply border-2 border-dashed border-pencil px-3 py-2 text-left;
+  }
+  .prose-cookbook th {
+    @apply bg-postit font-title;
+  }
+  .prose-cookbook img {
+    @apply my-4 max-w-full rounded-wobbly-md border-2 border-pencil;
+  }
+  .prose-cookbook input[type='checkbox'] {
+    @apply mr-2;
+    accent-color: #ff4d4d;
+  }
+  .prose-cookbook hr {
+    @apply my-6 border-0 border-t-2 border-dashed border-muted;
+  }
+}
+
+/* 隐藏滚动条但保留滚动（用于横向抽屉等） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* @uiw/react-md-editor 手绘风微调 */
+.w-md-editor {
+  --color-canvas-default: #ffffff;
+  box-shadow: none !important;
+  border: 2px solid #2d2d2d;
+  border-radius: 12px 3px 10px 3px / 3px 10px 3px 12px;
+  font-family: 'Patrick Hand', 'LXGW WenKai', cursive;
+}
+.w-md-editor-text,
+.w-md-editor-text-input,
+.w-md-editor-text-pre > code {
+  font-family: 'Patrick Hand', 'LXGW WenKai', cursive !important;
+}
