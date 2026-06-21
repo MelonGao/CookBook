@@ -1,8 +1,8 @@
 // 新建 / 编辑菜谱 —— Markdown 实时预览 + 标题/标签/封面/来源/食材
 // 封面图上传到 Supabase Storage（v1.1）
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Sparkles, Trash2, X } from 'lucide-react';
 import type { Ingredient, RecipeSource } from '@/types/recipe';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -12,6 +12,8 @@ import {
   mergeIngredients,
   parseIngredientsFromMarkdown,
 } from '@/lib/parseIngredients';
+import { clearDraft, dataUrlToFile, readDraft, writeDraft, type RecipeDraft } from '@/lib/drafts';
+import { formatRelative } from '@/lib/date';
 import MarkdownEditor from '@/components/recipe/MarkdownEditor';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -60,6 +62,13 @@ export default function RecipeEditor() {
   const [saveError, setSaveError] = useState('');
   const [smartOpen, setSmartOpen] = useState(false);
   const [smartDraft, setSmartDraft] = useState<Ingredient[]>([]);
+  // 用量输入框的"用户正在键入"原文（避免 React 把 "1." 立刻规范化成 1，导致小数点输不进去）
+  const [amountTexts, setAmountTexts] = useState<Record<number, string>>({});
+  const [smartAmountTexts, setSmartAmountTexts] = useState<Record<number, string>>({});
+  // 草稿：检测到的待恢复草稿 + 用户最近一次手动保存草稿的反馈
+  const [draftFound, setDraftFound] = useState<RecipeDraft | null>(null);
+  const [draftMsg, setDraftMsg] = useState('');
+  const draftMsgTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isEdit || loaded || !ready) return;
@@ -74,6 +83,14 @@ export default function RecipeEditor() {
     setIngredients(root?.ingredients ?? []);
     setLoaded(true);
   }, [isEdit, loaded, ready, id, getRecipe, getVersion]);
+
+  // 进编辑器时（新建一定查，编辑要等 loaded 完成以免被原版盖住）扫一次本地草稿
+  useEffect(() => {
+    if (isEdit && !loaded) return;
+    const d = readDraft(id);
+    if (d) setDraftFound(d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, loaded]);
 
   // 把"输入了但还没回车提交"的草稿标签也算进去，避免按钮明明该亮却灰着
   const pendingTag = tagDraft.trim();
@@ -110,6 +127,8 @@ export default function RecipeEditor() {
     } else {
       setIngredients((prev) => mergeIngredients(prev, clean));
     }
+    setAmountTexts({}); // 量值正在键入态作废
+    setSmartAmountTexts({});
     setSmartOpen(false);
   };
 
@@ -119,6 +138,57 @@ export default function RecipeEditor() {
     const reader = new FileReader();
     reader.onload = () => setCover(reader.result as string);
     reader.readAsDataURL(file);
+  };
+
+  const flashDraftMsg = (msg: string) => {
+    setDraftMsg(msg);
+    if (draftMsgTimer.current) window.clearTimeout(draftMsgTimer.current);
+    draftMsgTimer.current = window.setTimeout(() => setDraftMsg(''), 2400);
+  };
+
+  const handleSaveDraft = () => {
+    const ok = writeDraft(id, {
+      title,
+      tags: effectiveTags,
+      cover,
+      bodyMd,
+      ingredients,
+      source,
+      savedAt: Date.now(),
+    });
+    flashDraftMsg(ok ? '已保存为草稿' : '草稿已保存（封面太大未存）');
+  };
+
+  const handleRestoreDraft = async () => {
+    if (!draftFound) return;
+    setTitle(draftFound.title);
+    setTags(draftFound.tags);
+    setBodyMd(draftFound.bodyMd);
+    setIngredients(draftFound.ingredients);
+    setSource(draftFound.source);
+    setAmountTexts({}); // 重置正在键入态
+    if (draftFound.cover) {
+      setCover(draftFound.cover);
+      // 如果是 data: URL，把它转回 File 以便重新走压缩 + 上传流程
+      if (draftFound.cover.startsWith('data:')) {
+        try {
+          const f = await dataUrlToFile(draftFound.cover);
+          setCoverFile(f);
+        } catch (err) {
+          console.warn('[draft] 封面恢复失败，需重新选择', err);
+          setCoverFile(null);
+        }
+      } else {
+        setCoverFile(null);
+      }
+    }
+    setDraftFound(null);
+    flashDraftMsg('已恢复草稿');
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft(id);
+    setDraftFound(null);
   };
 
   const handleSave = async () => {
@@ -160,6 +230,7 @@ export default function RecipeEditor() {
             ingredients: cleanIngredients,
           });
         }
+        clearDraft(id);
         navigate(`/recipes/${id}`);
       } else {
         const created = await createRecipe(
@@ -173,6 +244,7 @@ export default function RecipeEditor() {
           },
           userId
         );
+        clearDraft(undefined);
         navigate(`/recipes/${created.id}`);
       }
     } catch (err) {
@@ -336,15 +408,26 @@ export default function RecipeEditor() {
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={ing.amount || ''}
+                    value={amountTexts[idx] ?? (ing.amount ? String(ing.amount) : '')}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (raw === '') {
+                      // 只接受合法的"正在输入的小数"——支持 "1."、"0.5"、".5" 等中间态
+                      if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
+                      setAmountTexts((prev) => ({ ...prev, [idx]: raw }));
+                      if (raw === '' || raw === '.') {
                         patchIngredient(setIngredients, idx, { amount: 0 });
-                        return;
+                      } else {
+                        const n = Number(raw);
+                        if (!Number.isNaN(n)) patchIngredient(setIngredients, idx, { amount: n });
                       }
-                      const n = Number(raw);
-                      if (!Number.isNaN(n)) patchIngredient(setIngredients, idx, { amount: n });
+                    }}
+                    onBlur={() => {
+                      // 失焦后丢掉键入态，下次显示直接走 ing.amount → 规范化
+                      setAmountTexts((prev) => {
+                        const next = { ...prev };
+                        delete next[idx];
+                        return next;
+                      });
                     }}
                     placeholder="量"
                     className="input w-20 !px-2"
@@ -356,7 +439,10 @@ export default function RecipeEditor() {
                     className="input w-20 !px-2"
                   />
                   <button
-                    onClick={() => setIngredients(ingredients.filter((_, i) => i !== idx))}
+                    onClick={() => {
+                      setIngredients(ingredients.filter((_, i) => i !== idx));
+                      setAmountTexts({}); // 索引会偏移，清掉键入态
+                    }}
                     className="px-1 text-pencil/50 hover:text-accent"
                     aria-label="删除该行"
                   >
@@ -402,7 +488,8 @@ export default function RecipeEditor() {
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-3 border-t-2 border-dashed border-pencil pt-4">
+      <div className="flex flex-wrap items-center justify-end gap-3 border-t-2 border-dashed border-pencil pt-4">
+        {draftMsg && <span className="font-hand text-meta text-ballpoint">{draftMsg}</span>}
         {saveError ? (
           <span className="font-hand text-meta text-accent">{saveError}</span>
         ) : (
@@ -411,10 +498,56 @@ export default function RecipeEditor() {
         <Button variant="ghost" onClick={() => navigate(-1)}>
           取消
         </Button>
+        <Button
+          variant="outline"
+          onClick={handleSaveDraft}
+          disabled={uploading || saving}
+          title="保存到本地，下次进来可以继续编辑（不会上传到云端）"
+        >
+          <Save size={14} strokeWidth={2.5} />
+          保存为草稿
+        </Button>
         <Button disabled={!valid || !userId || uploading || saving} onClick={handleSave}>
           {uploading ? '上传封面中…' : saving ? '保存中…' : isEdit ? '保存修改' : '创建菜谱'}
         </Button>
       </div>
+
+      <Modal
+        open={!!draftFound}
+        title="发现未保存的草稿"
+        onClose={() => setDraftFound(null)}
+        footer={
+          <>
+            <Button variant="ghost" onClick={handleDiscardDraft}>
+              丢弃草稿
+            </Button>
+            <Button onClick={handleRestoreDraft}>恢复草稿</Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="font-hand text-body text-pencil/70">
+            上次{draftFound ? `（${formatRelative(draftFound.savedAt)}）` : ''}你在
+            {isEdit ? '编辑这个菜谱' : '新建菜谱'}时保存过一份草稿。
+          </p>
+          {draftFound && (
+            <div className="rounded-wobbly-sm border-2 border-dashed border-pencil bg-postit/40 px-3 py-2 text-meta font-hand text-pencil/70">
+              <div>菜名：{draftFound.title || <span className="text-pencil/40">（空）</span>}</div>
+              <div>
+                标签：
+                {draftFound.tags.length > 0
+                  ? draftFound.tags.join('、')
+                  : <span className="text-pencil/40">（空）</span>}
+              </div>
+              <div>食材：{draftFound.ingredients.length} 项</div>
+              <div>正文：{draftFound.bodyMd.length} 字</div>
+            </div>
+          )}
+          <p className="font-hand text-meta text-pencil/50">
+            恢复后会替换当前表单内容。丢弃则永久删除草稿。
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         open={smartOpen}
@@ -465,15 +598,24 @@ export default function RecipeEditor() {
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={ing.amount || ''}
+                    value={smartAmountTexts[idx] ?? (ing.amount ? String(ing.amount) : '')}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (raw === '') {
+                      if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
+                      setSmartAmountTexts((prev) => ({ ...prev, [idx]: raw }));
+                      if (raw === '' || raw === '.') {
                         patchIngredient(setSmartDraft, idx, { amount: 0 });
-                        return;
+                      } else {
+                        const n = Number(raw);
+                        if (!Number.isNaN(n)) patchIngredient(setSmartDraft, idx, { amount: n });
                       }
-                      const n = Number(raw);
-                      if (!Number.isNaN(n)) patchIngredient(setSmartDraft, idx, { amount: n });
+                    }}
+                    onBlur={() => {
+                      setSmartAmountTexts((prev) => {
+                        const next = { ...prev };
+                        delete next[idx];
+                        return next;
+                      });
                     }}
                     placeholder="量"
                     className="input w-20 !px-2"
@@ -485,7 +627,10 @@ export default function RecipeEditor() {
                     className="input w-20 !px-2"
                   />
                   <button
-                    onClick={() => setSmartDraft(smartDraft.filter((_, i) => i !== idx))}
+                    onClick={() => {
+                      setSmartDraft(smartDraft.filter((_, i) => i !== idx));
+                      setSmartAmountTexts({});
+                    }}
                     className="px-1 text-pencil/50 hover:text-accent"
                     aria-label="删除该行"
                   >
